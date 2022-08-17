@@ -115,7 +115,7 @@ def main(args):
 
     print(df.head(1))
 
-    SAVE_PATH = f"../{today}_{uid}/"
+    SAVE_PATH = f"./models/{today}_{uid}/"
     if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
         if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
             print("이미 모델 있음. 지우고 진행하기.")
