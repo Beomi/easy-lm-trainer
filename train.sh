@@ -1,0 +1,1 @@
+python main.py --model_name='kakaobrain/kogpt' --model_revision='KoGPT6B-ryan1.5b-float16' --bos_token='[BOS]' --eos_token='[EOS]' --unk_token='[UNK]' --pad_token='[PAD]' --mask_token='[MASK]' --data_file_path='./data/data.csv' --num_train_epochs=10 --bf16=True
