@@ -2,6 +2,7 @@ import random
 from datetime import date
 from pathlib import Path
 from pprint import pprint
+from itertools import chain
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
     pipeline,
+    default_data_collator,
 )
 
 
@@ -53,15 +55,26 @@ def main(args):
     else:
         uid = ""
 
+    arg_dict = {}
+
+    if args.bos_token:
+        arg_dict["bos_token"] = args.bos_token
+    if args.eos_token:
+        arg_dict["eos_token"] = args.eos_token
+    if args.unk_token:
+        arg_dict["unk_token"] = args.unk_token
+    if args.pad_token:
+        arg_dict["pad_token"] = args.pad_token
+    if args.mask_token:
+        arg_dict["mask_token"] = args.mask_token
+    if args.block_size:
+        arg_dict["model_max_length"] = args.block_size
+    if args.model_revision:
+        arg_dict["model_revision"] = args.model_revision
+
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name,
-        revision=args.model_revision if args.model_revision else None,
-        bos_token=None if not args.bos_token else args.bos_token,
-        eos_token=None if not args.eos_token else args.eos_token,
-        unk_token=None if not args.unk_token else args.unk_token,
-        pad_token=None if not args.pad_token else args.pad_token,
-        mask_token=None if not args.mask_token else args.mask_token,
-        model_max_length=args.block_size,
+        **arg_dict,
     )
 
     def tokenize_function(examples):
@@ -79,18 +92,17 @@ def main(args):
         return s
 
     def group_texts(examples):
+        block_size = args.block_size
         # Concatenate all texts.
-        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
         total_length = len(concatenated_examples[list(examples.keys())[0]])
         # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
         # customize this part to your needs.
-        total_length = (total_length // args.block_size) * args.block_size
+        if total_length >= block_size:
+            total_length = (total_length // block_size) * block_size
         # Split by chunks of max_len.
         result = {
-            k: [
-                t[i : i + args.block_size]
-                for i in range(0, total_length, args.block_size)
-            ]
+            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
             for k, t in concatenated_examples.items()
         }
         result["labels"] = result["input_ids"].copy()
@@ -128,20 +140,21 @@ def main(args):
             "test": Dataset.from_pandas(test[[args.data_text_column]]),
         }
     )
+    print(datasets)
 
     tokenized_datasets = datasets.map(
         tokenize_function,
         batched=True,
         num_proc=4,
-        remove_columns=[args.data_text_column],
+        remove_columns=[args.data_text_column, "__index_level_0__"],
     )
+    print(tokenized_datasets)
 
     if args.group_text:
         lm_datasets = tokenized_datasets.map(
             group_texts,
             batched=True,
-            batch_size=4,
-            num_proc=2,
+            num_proc=4,
         )
     else:
         lm_datasets = tokenized_datasets
@@ -149,7 +162,6 @@ def main(args):
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         revision=args.model_revision if args.model_revision else None,
-        pad_token_id=tokenizer.eos_token_id,
         torch_dtype="auto",
         low_cpu_mem_usage=True if torch.cuda.is_available() else False,
     )
@@ -173,11 +185,17 @@ def main(args):
         # deepspeed=ds_config,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
     )
+    
+    trainer_args_dict = {}
+    if args.group_text:
+        trainer_args_dict['data_collator'] = default_data_collator
+    
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=lm_datasets["train"],
         eval_dataset=lm_datasets["test"],
+        **trainer_args_dict,
     )
     try:
         trainer.train()
