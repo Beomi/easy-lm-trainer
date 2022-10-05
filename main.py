@@ -111,6 +111,7 @@ def main(args):
         return result
 
     today = date.today().isoformat()
+    SAVE_PATH = f"./models/{today}_{uid}/"
     
     if args.test_file_path: # Test 파일 있는 경우
         if args.train_file_path.endswith(".csv"):
@@ -144,8 +145,7 @@ def main(args):
 
         print(df.head(1))
         print(test_df.head(1))
-
-        SAVE_PATH = f"./models/{today}_{uid}/"
+        
         if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
             if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
                 print("이미 모델 있음. 지우고 진행하기.")
@@ -171,13 +171,14 @@ def main(args):
 
         print(df.head(1))
 
-        SAVE_PATH = f"./models/{today}_{uid}/"
         if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
             if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
                 print("이미 모델 있음. 지우고 진행하기.")
                 return  # 이미 학습됨.
 
         train, test = train_test_split(df, random_state=42, test_size=0.1)
+        train.to_json(args.train_file_path+f'.{uid}.train.json')
+        test.to_json(args.train_file_path+f'.{uid}.test.json') # machine readable
         
         
     datasets = DatasetDict(
