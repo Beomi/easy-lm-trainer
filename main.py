@@ -34,8 +34,8 @@ class SimpleArgumentParser(Tap):
     unk_token: str = ""
     pad_token: str = ""
     mask_token: str = ""
-    train_file_path: Path
-    test_file_path: Optional[Path] # Optional
+    train_file_path: str
+    test_file_path: str = "" # Optional
     data_text_column: str = "text"
     group_text: bool = False
     force_retrain: bool = False
@@ -113,28 +113,28 @@ def main(args):
     today = date.today().isoformat()
     
     if args.test_file_path: # Test 파일 있는 경우
-        if str(args.train_file_path).endswith(".csv"):
+        if args.train_file_path.endswith(".csv"):
             df = pd.read_csv(args.train_file_path)
-        elif str(args.train_file_path).endswith(".json"):
+        elif args.train_file_path.endswith(".json"):
             df = pd.read_json(args.train_file_path)
-        elif str(args.train_file_path).endswith(".xlsx"):
+        elif args.train_file_path.endswith(".xlsx"):
             df = pd.read_excel(args.train_file_path)
-        elif str(args.train_file_path).endswith(".tsv"):
+        elif args.train_file_path.endswith(".tsv"):
             df = pd.read_csv(args.train_file_path, sep="\t")
-        elif str(args.train_file_path).endswith(".txt"):
+        elif args.train_file_path.endswith(".txt"):
             df = pd.read_csv(args.train_file_path, sep="\t")
         else:
             raise ValueError(f"Unknown file format: {args.train_file_path}")
             
-        if str(args.test_file_path).endswith(".csv"):
+        if args.test_file_path.endswith(".csv"):
             test_df = pd.read_csv(args.test_file_path)
-        elif str(args.test_file_path).endswith(".json"):
+        elif args.test_file_path.endswith(".json"):
             test_df = pd.read_json(args.test_file_path)
-        elif str(args.test_file_path).endswith(".xlsx"):
+        elif args.test_file_path.endswith(".xlsx"):
             test_df = pd.read_excel(args.test_file_path)
-        elif str(args.test_file_path).endswith(".tsv"):
+        elif args.test_file_path.endswith(".tsv"):
             test_df = pd.read_csv(args.test_file_path, sep="\t")
-        elif str(args.test_file_path).endswith(".txt"):
+        elif args.test_file_path.endswith(".txt"):
             test_df = pd.read_csv(args.test_file_path, sep="\t")
         else:
             raise ValueError(f"Unknown file format: {args.test_file_path}")
@@ -154,15 +154,15 @@ def main(args):
         train, test = df, test_df
         
     else: # Train 만 있는 경우
-        if str(args.train_file_path).endswith(".csv"):
+        if args.train_file_path.endswith(".csv"):
             df = pd.read_csv(args.train_file_path)
-        elif str(args.train_file_path).endswith(".json"):
+        elif args.train_file_path.endswith(".json"):
             df = pd.read_json(args.train_file_path)
-        elif str(args.train_file_path).endswith(".xlsx"):
+        elif args.train_file_path.endswith(".xlsx"):
             df = pd.read_excel(args.train_file_path)
-        elif str(args.train_file_path).endswith(".tsv"):
+        elif args.train_file_path.endswith(".tsv"):
             df = pd.read_csv(args.train_file_path, sep="\t")
-        elif str(args.train_file_path).endswith(".txt"):
+        elif args.train_file_path.endswith(".txt"):
             df = pd.read_csv(args.train_file_path, sep="\t")
         else:
             raise ValueError(f"Unknown file format: {args.train_file_path}")
