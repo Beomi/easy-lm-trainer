@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 from pprint import pprint
 from itertools import chain
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -33,7 +34,8 @@ class SimpleArgumentParser(Tap):
     unk_token: str = ""
     pad_token: str = ""
     mask_token: str = ""
-    data_file_path: Path
+    train_file_path: Path
+    test_file_path: Optional[Path] # Optional
     data_text_column: str = "text"
     group_text: bool = False
     force_retrain: bool = False
@@ -109,31 +111,75 @@ def main(args):
         return result
 
     today = date.today().isoformat()
+    
+    if args.test_file_path: # Test 파일 있는 경우
+        if str(args.train_file_path).endswith(".csv"):
+            df = pd.read_csv(args.train_file_path)
+        elif str(args.train_file_path).endswith(".json"):
+            df = pd.read_json(args.train_file_path)
+        elif str(args.train_file_path).endswith(".xlsx"):
+            df = pd.read_excel(args.train_file_path)
+        elif str(args.train_file_path).endswith(".tsv"):
+            df = pd.read_csv(args.train_file_path, sep="\t")
+        elif str(args.train_file_path).endswith(".txt"):
+            df = pd.read_csv(args.train_file_path, sep="\t")
+        else:
+            raise ValueError(f"Unknown file format: {args.train_file_path}")
+            
+        if str(args.test_file_path).endswith(".csv"):
+            test_df = pd.read_csv(args.test_file_path)
+        elif str(args.test_file_path).endswith(".json"):
+            test_df = pd.read_json(args.test_file_path)
+        elif str(args.test_file_path).endswith(".xlsx"):
+            test_df = pd.read_excel(args.test_file_path)
+        elif str(args.test_file_path).endswith(".tsv"):
+            test_df = pd.read_csv(args.test_file_path, sep="\t")
+        elif str(args.test_file_path).endswith(".txt"):
+            test_df = pd.read_csv(args.test_file_path, sep="\t")
+        else:
+            raise ValueError(f"Unknown file format: {args.test_file_path}")
 
-    if str(args.data_file_path).endswith(".csv"):
-        df = pd.read_csv(args.data_file_path)
-    elif str(args.data_file_path).endswith(".json"):
-        df = pd.read_json(args.data_file_path)
-    elif str(args.data_file_path).endswith(".xlsx"):
-        df = pd.read_excel(args.data_file_path)
-    elif str(args.data_file_path).endswith(".tsv"):
-        df = pd.read_csv(args.data_file_path, sep="\t")
-    elif str(args.data_file_path).endswith(".txt"):
-        df = pd.read_csv(args.data_file_path, sep="\t")
-    else:
-        raise ValueError(f"Unknown file format: {args.data_file_path}")
+        assert args.data_text_column in df.columns
+        assert args.data_text_column in test_df.columns
 
-    assert args.data_text_column in df.columns
+        print(df.head(1))
+        print(test_df.head(1))
 
-    print(df.head(1))
+        SAVE_PATH = f"./models/{today}_{uid}/"
+        if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
+            if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
+                print("이미 모델 있음. 지우고 진행하기.")
+                return  # 이미 학습됨.
 
-    SAVE_PATH = f"./models/{today}_{uid}/"
-    if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
-        if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
-            print("이미 모델 있음. 지우고 진행하기.")
-            return  # 이미 학습됨.
+        train, test = df, test_df
+        
+    else: # Train 만 있는 경우
+        if str(args.train_file_path).endswith(".csv"):
+            df = pd.read_csv(args.train_file_path)
+        elif str(args.train_file_path).endswith(".json"):
+            df = pd.read_json(args.train_file_path)
+        elif str(args.train_file_path).endswith(".xlsx"):
+            df = pd.read_excel(args.train_file_path)
+        elif str(args.train_file_path).endswith(".tsv"):
+            df = pd.read_csv(args.train_file_path, sep="\t")
+        elif str(args.train_file_path).endswith(".txt"):
+            df = pd.read_csv(args.train_file_path, sep="\t")
+        else:
+            raise ValueError(f"Unknown file format: {args.train_file_path}")
 
-    train, test = train_test_split(df, random_state=42, test_size=0.1)
+        assert args.data_text_column in df.columns
+
+        print(df.head(1))
+
+        SAVE_PATH = f"./models/{today}_{uid}/"
+        if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
+            if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
+                print("이미 모델 있음. 지우고 진행하기.")
+                return  # 이미 학습됨.
+
+        train, test = train_test_split(df, random_state=42, test_size=0.1)
+        
+        
     datasets = DatasetDict(
         {
             "train": Dataset.from_pandas(train[[args.data_text_column]]),
@@ -146,7 +192,7 @@ def main(args):
         tokenize_function,
         batched=True,
         num_proc=4,
-        remove_columns=[args.data_text_column, "__index_level_0__"],
+        # remove_columns=[args.data_text_column, "__index_level_0__"],
     )
     print(tokenized_datasets)
 
