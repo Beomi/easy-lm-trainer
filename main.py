@@ -25,7 +25,7 @@ from transformers import (
 class SimpleArgumentParser(Tap):
     use_projectwise_cache: bool = False
     use_random_uuid: bool = True
-    block_size: int = 256
+    block_size: int = 1024
     batch_size: int = 8
     model_name: str
     model_revision: str = ""
@@ -45,8 +45,9 @@ class SimpleArgumentParser(Tap):
     fp16: bool = False
     optimizer: str = "adafactor"
     gradient_accumulation_steps: int = 1
-    do_test_generate: bool = True
+    do_test_generate: bool = False
     random_seed: int = 42
+    do_eval: bool = False
 
 
 def main(args):
@@ -76,12 +77,14 @@ def main(args):
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name,
+        revision=args.model_revision if args.model_revision else None,
         **arg_dict,
     )
 
     def tokenize_function(examples):
         if args.group_text:
             s = tokenizer(examples[args.data_text_column])
+            return s
         else:
             s = tokenizer(
                 examples[args.data_text_column],
@@ -89,20 +92,19 @@ def main(args):
                 max_length=args.block_size,
                 truncation=True,
             )
-        if not args.group_text:
             s["labels"] = s["input_ids"].copy()
-        return s
+            return s
 
     def group_texts(examples):
-        block_size = args.block_size
-        # Concatenate all texts.
         concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
         total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
+        print(f"{total_length=}")
+        
+        block_size = args.block_size
+
         if total_length >= block_size:
             total_length = (total_length // block_size) * block_size
-        # Split by chunks of max_len.
+
         result = {
             k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
             for k, t in concatenated_examples.items()
@@ -118,8 +120,6 @@ def main(args):
             df = pd.read_csv(args.train_file_path)
         elif args.train_file_path.endswith(".json"):
             df = pd.read_json(args.train_file_path)
-        elif args.train_file_path.endswith(".jsonl"):
-            df = pd.read_json(args.train_file_path, lines=True)
         elif args.train_file_path.endswith(".xlsx"):
             df = pd.read_excel(args.train_file_path)
         elif args.train_file_path.endswith(".tsv"):
@@ -160,6 +160,8 @@ def main(args):
             df = pd.read_csv(args.train_file_path)
         elif args.train_file_path.endswith(".json"):
             df = pd.read_json(args.train_file_path)
+        elif args.train_file_path.endswith(".jsonl"):
+            df = pd.read_json(args.train_file_path, lines=True)
         elif args.train_file_path.endswith(".xlsx"):
             df = pd.read_excel(args.train_file_path)
         elif args.train_file_path.endswith(".tsv"):
@@ -172,30 +174,38 @@ def main(args):
         assert args.data_text_column in df.columns
 
         print(df.head(1))
+        
+        
 
         if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
             if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
                 print("이미 모델 있음. 지우고 진행하기.")
                 return  # 이미 학습됨.
 
-        train, test = train_test_split(df, random_state=42, test_size=0.1)
-        train.to_json(args.train_file_path+f'.{uid}.train.json')
-        test.to_json(args.train_file_path+f'.{uid}.test.json') # machine readable
-        
-        
-    datasets = DatasetDict(
-        {
-            "train": Dataset.from_pandas(train[[args.data_text_column]]),
-            "test": Dataset.from_pandas(test[[args.data_text_column]]),
-        }
-    )
+        if args.do_eval:
+            train, test = train_test_split(df, random_state=42, test_size=0.01)
+            train.to_json(args.train_file_path+f'.{uid}.train.json')
+            test.to_json(args.train_file_path+f'.{uid}.test.json') # machine readable
+            datasets = DatasetDict(
+                {
+                    "train": Dataset.from_pandas(train[[args.data_text_column]]),
+                    "test": Dataset.from_pandas(test[[args.data_text_column]]),
+                }
+            )
+        else:
+            train = df
+            datasets = DatasetDict(
+                {
+                    "train": Dataset.from_pandas(train[[args.data_text_column]]),
+                }
+            )
     print(datasets)
 
     tokenized_datasets = datasets.map(
         tokenize_function,
         batched=True,
         num_proc=4,
-        # remove_columns=[args.data_text_column, "__index_level_0__"],
+        remove_columns=[args.data_text_column],
     )
     print(tokenized_datasets)
 
@@ -243,7 +253,7 @@ def main(args):
         model=model,
         args=training_args,
         train_dataset=lm_datasets["train"],
-        eval_dataset=lm_datasets["test"],
+        eval_dataset=lm_datasets.get('test'),
         **trainer_args_dict,
     )
     try:
