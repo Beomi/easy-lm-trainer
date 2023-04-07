@@ -118,6 +118,8 @@ def main(args):
             df = pd.read_csv(args.train_file_path)
         elif args.train_file_path.endswith(".json"):
             df = pd.read_json(args.train_file_path)
+        elif args.train_file_path.endswith(".jsonl"):
+            df = pd.read_json(args.train_file_path, lines=True)
         elif args.train_file_path.endswith(".xlsx"):
             df = pd.read_excel(args.train_file_path)
         elif args.train_file_path.endswith(".tsv"):
