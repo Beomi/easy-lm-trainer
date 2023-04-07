@@ -25,6 +25,7 @@ from transformers import (
 class SimpleArgumentParser(Tap):
     use_projectwise_cache: bool = False
     use_random_uuid: bool = True
+    uuid: str = ""
     block_size: int = 1024
     batch_size: int = 8
     model_name: str
@@ -52,11 +53,16 @@ class SimpleArgumentParser(Tap):
 
 def main(args):
     if args.use_random_uuid:
+        if args.uuid:
+            raise Exception("`use_random_uuid` and `uuid` should not used together!")
         uid = OrderedUUID()
         uid = "-".join(str(uid).split("-")[:2])
         print(f"{uid=}")
+    elif args.uuid:
+        uid = args.uuid
     else:
         uid = ""
+    
 
     arg_dict = {}
 
@@ -175,8 +181,6 @@ def main(args):
 
         print(df.head(1))
         
-        
-
         if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
             if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
                 print("이미 모델 있음. 지우고 진행하기.")
@@ -199,6 +203,13 @@ def main(args):
                     "train": Dataset.from_pandas(train[[args.data_text_column]]),
                 }
             )
+        
+    datasets = DatasetDict(
+        {
+            "train": Dataset.from_pandas(train[[args.data_text_column]]),
+            # "test": Dataset.from_pandas(test[[args.data_text_column]]),
+        }
+    )
     print(datasets)
 
     tokenized_datasets = datasets.map(
@@ -228,11 +239,11 @@ def main(args):
     training_args = TrainingArguments(
         SAVE_PATH,
         save_strategy="epoch",
-        evaluation_strategy="epoch",
+        evaluation_strategy="epoch" if args.do_eval else "no",
         logging_first_step=True,
         logging_strategy="epoch",
         save_total_limit=1,
-        load_best_model_at_end=True,
+        load_best_model_at_end=True if args.do_eval else False,
         learning_rate=args.learning_rate,
         # weight_decay=0.001,
         optim=args.optimizer,
@@ -253,7 +264,7 @@ def main(args):
         model=model,
         args=training_args,
         train_dataset=lm_datasets["train"],
-        eval_dataset=lm_datasets.get('test'),
+        eval_dataset=lm_datasets.get('test') if args.do_eval else None,
         **trainer_args_dict,
     )
     try:
