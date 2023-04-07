@@ -49,6 +49,7 @@ class SimpleArgumentParser(Tap):
     do_test_generate: bool = False
     random_seed: int = 42
     do_eval: bool = False
+    save_as_fp16: bool = True
 
 
 def main(args):
@@ -271,7 +272,11 @@ def main(args):
         trainer.train()
     except KeyboardInterrupt:
         return model, tokenizer
-    model.save_pretrained(SAVE_PATH)
+    
+    if args.save_as_fp16:
+        model.half().save_pretrained(SAVE_PATH)
+    else:
+        model.save_pretrained(SAVE_PATH)
     tokenizer.save_pretrained(SAVE_PATH)
     print("model saved to ", SAVE_PATH)
 
