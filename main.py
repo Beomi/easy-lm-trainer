@@ -50,6 +50,9 @@ class SimpleArgumentParser(Tap):
     random_seed: int = 42
     do_eval: bool = False
     save_as_fp16: bool = True
+    fsdp: list = []
+    fsdp_config: str = ''
+    deepspeed: str = ''
 
 
 def main(args):
@@ -229,13 +232,14 @@ def main(args):
         )
     else:
         lm_datasets = tokenized_datasets
-
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name,
-        revision=args.model_revision if args.model_revision else None,
-        torch_dtype="auto",
-        low_cpu_mem_usage=True if torch.cuda.is_available() else False,
-    )
+        
+    def _get_model_load_type():
+        if torch.cuda.is_available() and args.fp16:
+            return torch.float16
+        elif torch.cuda.is_available() and args.bf16:
+            return torch.bfloa16
+        else:
+            return 'auto'
 
     training_args = TrainingArguments(
         SAVE_PATH,
@@ -247,20 +251,31 @@ def main(args):
         load_best_model_at_end=True if args.do_eval else False,
         learning_rate=args.learning_rate,
         # weight_decay=0.001,
-        optim=args.optimizer,
+        # optim=args.optimizer,
         push_to_hub=False,
         per_device_train_batch_size=args.batch_size,
+        # train_micro_batch_size_per_gpu=args.batch_size,
         bf16=args.bf16,
         fp16=args.fp16,
         num_train_epochs=args.num_train_epochs,
-        # deepspeed=ds_config,
+        deepspeed=args.deepspeed,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        # fsdp=args.fsdp,
+        # fsdp_config=args.fsdp_config,
+        # fsdp_transformer_layer_cls_to_wrap=args.fsdp_transformer_layer_cls_to_wrap,
     )
     
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        revision=args.model_revision if args.model_revision else None,
+        torch_dtype='auto',  #_get_model_load_type(),
+        # low_cpu_mem_usage=True # Not available when Zero-3
+    )
+
     trainer_args_dict = {}
     if args.group_text:
         trainer_args_dict['data_collator'] = default_data_collator
-    
+
     trainer = Trainer(
         model=model,
         args=training_args,
