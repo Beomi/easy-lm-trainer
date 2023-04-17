@@ -1,3 +1,6 @@
+import os
+local_rank = int(os.environ["LOCAL_RANK"])
+
 import random
 from datetime import date
 from pathlib import Path
@@ -184,7 +187,7 @@ def main(args):
         assert args.data_text_column in df.columns
 
         print(df.head(1))
-        
+
         if not args.force_retrain:  # Retrain 시에는 무시하고 Overwrite
             if (Path(SAVE_PATH) / "pytorch_model.bin").exists():
                 print("이미 모델 있음. 지우고 진행하기.")
@@ -207,7 +210,7 @@ def main(args):
                     "train": Dataset.from_pandas(train[[args.data_text_column]]),
                 }
             )
-        
+
     datasets = DatasetDict(
         {
             "train": Dataset.from_pandas(train[[args.data_text_column]]),
@@ -232,7 +235,8 @@ def main(args):
         )
     else:
         lm_datasets = tokenized_datasets
-        
+
+
     def _get_model_load_type():
         if torch.cuda.is_available() and args.fp16:
             return torch.float16
@@ -243,12 +247,12 @@ def main(args):
 
     training_args = TrainingArguments(
         SAVE_PATH,
-        save_strategy="epoch",
+        save_strategy="epoch" if local_rank == 0 else "no",
         evaluation_strategy="epoch" if args.do_eval else "no",
         logging_first_step=True,
         logging_strategy="epoch",
-        save_total_limit=1,
-        load_best_model_at_end=True if args.do_eval else False,
+        save_total_limit=1 if local_rank == 0 else None,
+        load_best_model_at_end=True if (args.do_eval and local_rank == 0) else False,
         learning_rate=args.learning_rate,
         # weight_decay=0.001,
         # optim=args.optimizer,
@@ -288,12 +292,13 @@ def main(args):
     except KeyboardInterrupt:
         return model, tokenizer
     
-    if args.save_as_fp16:
-        model.half().save_pretrained(SAVE_PATH)
-    else:
-        model.save_pretrained(SAVE_PATH)
-    tokenizer.save_pretrained(SAVE_PATH)
-    print("model saved to ", SAVE_PATH)
+    if local_rank == 0:
+        if args.save_as_fp16:
+            model.half().save_pretrained(SAVE_PATH)
+        else:
+            model.save_pretrained(SAVE_PATH)
+        tokenizer.save_pretrained(SAVE_PATH)
+        print("model saved to ", SAVE_PATH)
 
     if args.do_test_generate:
         pipe = pipeline(
