@@ -12,10 +12,28 @@
 #     --num_train_epochs=10 \
 #     --data_text_column='text'
 
+# # Ployglot-Ko 3.8B 사용 예시
+# torchrun --nproc_per_node=4 --master_port=34321 main.py \
+#     --model_name='EleutherAI/polyglot-ko-5.8b' \
+#     --train_file_path='data/text_ko_alpaca_data.jsonl' \
+#     --num_train_epochs=1 \
+#     --data_text_column='text' \
+#     --block_size=256 \
+#     --batch_size=1 \
+#     --fp16=True \
+#     --fsdp='auto_wrap' \
+#     --fsdp_config=fsdp_config.json \
+#     --deepspeed=ds_config.json
+#     # --fsdp_transformer_layer_cls_to_wrap='GPTNeoXLayer' \
+
 # Ployglot-Ko 3.8B 사용 예시
-python main.py \
-    --model_name='EleutherAI/polyglot-ko-3.8b' \
-    --train_file_path='./data/train.csv' \
-    --test_file_path='./data/test.csv' \
-    --num_train_epochs=5 \
-    --data_text_column='text'
+torchrun --nproc_per_node=4 --master_port=34321 main.py \
+    --model_name='EleutherAI/polyglot-ko-12.8b' \
+    --train_file_path='data/text_ko_alpaca_data.jsonl' \
+    --num_train_epochs=1 \
+    --data_text_column='text' \
+    --block_size=1024 \
+    --batch_size=1 \
+    --fp16=True \
+    --deepspeed=ds_zero3.json
+    # --fsdp_transformer_layer_cls_to_wrap='GPTNeoXLayer' \

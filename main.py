@@ -236,6 +236,7 @@ def main(args):
     else:
         lm_datasets = tokenized_datasets
 
+
     def _get_model_load_type():
         if torch.cuda.is_available() and args.fp16:
             return torch.float16
@@ -267,7 +268,7 @@ def main(args):
         # fsdp_config=args.fsdp_config,
         # fsdp_transformer_layer_cls_to_wrap=args.fsdp_transformer_layer_cls_to_wrap,
     )
-
+    
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         revision=args.model_revision if args.model_revision else None,
