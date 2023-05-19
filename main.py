@@ -1,5 +1,5 @@
 import os
-local_rank = int(os.environ["LOCAL_RANK"])
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
 
 import random
 from datetime import date
