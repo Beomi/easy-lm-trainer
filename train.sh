@@ -26,7 +26,7 @@
 #     --deepspeed=ds_config.json
 #     # --fsdp_transformer_layer_cls_to_wrap='GPTNeoXLayer' \
 
-# Ployglot-Ko 3.8B 사용 예시
+# Ployglot-Ko 12.8B 4GPU 사용 예시
 torchrun --nproc_per_node=4 --master_port=34321 main.py \
     --model_name='EleutherAI/polyglot-ko-12.8b' \
     --train_file_path='data/text_ko_alpaca_data.jsonl' \
@@ -34,6 +34,6 @@ torchrun --nproc_per_node=4 --master_port=34321 main.py \
     --data_text_column='text' \
     --block_size=1024 \
     --batch_size=1 \
-    --fp16=True \
+    --bf16=True \
+    --group_text=True \
     --deepspeed=ds_zero3.json
-    # --fsdp_transformer_layer_cls_to_wrap='GPTNeoXLayer' \
