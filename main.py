@@ -255,7 +255,7 @@ def main(args):
         load_best_model_at_end=True if (args.do_eval and local_rank == 0) else False,
         learning_rate=args.learning_rate,
         # weight_decay=0.001,
-        # optim=args.optimizer,
+        optim=args.optimizer,
         push_to_hub=False,
         per_device_train_batch_size=args.batch_size,
         # train_micro_batch_size_per_gpu=args.batch_size,
